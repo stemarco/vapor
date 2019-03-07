@@ -14,7 +14,7 @@
   }
 
   &.input-field input, input {
-    padding-right: 22px;
+    padding-right: $multiline-input-padding-right;
   }
 
   label {
