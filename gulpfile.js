@@ -1,6 +1,7 @@
 // OPTIONS
 // --min                        Flag to enable minification                                         Default: false
 // --gzip                       Flag to enable gziphication                                         Default: false
+// --all                        Flag to remove all compiled files                                   Default: false
 
 const del = require('del');
 const pngSprite = require('coveo-png-sprite');
@@ -17,9 +18,16 @@ const merge = require('merge-stream');
 const svgmin = require('gulp-svgmin');
 const cheerio = require('gulp-cheerio');
 const filesToJson = require('gulp-files-to-json');
+const gfi = require('gulp-file-insert');
 const sortJSON = require('gulp-json-sort').default;
 const PluginError = require('plugin-error');
 const parseArgs = require('minimist');
+const sourcemaps = require('gulp-sourcemaps');
+const sass = require('gulp-sass');
+const autoprefixer = require('gulp-autoprefixer');
+const minifyCSS = require('gulp-clean-css');
+const _ = require('underscore');
+const s = require('underscore.string');
 
 const config = {
     autoprefixerOptions: {
@@ -79,15 +87,15 @@ gulp.task('clean', () => {
 });
 
 gulp.task('copy:images', () => {
-    return gulp.src('./resources/images/**/*').pipe(gulp.dest('./dist/images'));
+    return gulp.src('./resources/images/**/*').pipe(gulp.dest('./dist/images/'));
 });
 
 gulp.task('copy:fonts', () => {
-    return gulp.src('./resources/fonts/**/*').pipe(gulp.dest('./dist/fonts'));
+    return gulp.src('./resources/fonts/**/*').pipe(gulp.dest('./dist/fonts/'));
 });
 
 gulp.task('copy:js', () => {
-    return gulp.src('./resources/js/**/*').pipe(gulp.dest('./dist/js'));
+    return gulp.src('./resources/js/**/*').pipe(gulp.dest('./dist/js/'));
 });
 
 gulp.task('palette', (done) => {
@@ -141,7 +149,7 @@ function Dictionary(from) {
     };
 
     this.writeVaporSvgVersionFile = (to) => {
-        const code = 'VaporSVG.version = ' + JSON.stringify(require('../package.json').version) + ';';
+        const code = 'VaporSVG.version = ' + JSON.stringify(require('./package.json').version) + ';';
         fs.writeFileSync(to, code);
     };
 }
@@ -186,7 +194,7 @@ gulp.task('svg:concat', () => {
         .pipe(gulp.dest('docs/_data/'));
 });
 
-gulp.task('svg:enum', gulp.series('svg:concat'), () => {
+gulp.task('svg:enum', gulp.series('svg:concat', () => {
     const dict = new Dictionary('dist/svg/CoveoStyleGuideSvg.json');
 
     if (!fs.existsSync('tmp')) {
@@ -197,21 +205,21 @@ gulp.task('svg:enum', gulp.series('svg:concat'), () => {
 
     dict.writeVaporSvgVersionFile('tmp/version.js');
 
-    gulp.src('resources/js/VaporSVG.js')
+    return gulp.src('resources/js/VaporSVG.js')
         .pipe(gfi({'/* SVG Enum */': 'tmp/svg.js'}))
         .pipe(gfi({'/* VaporSVG version */': 'tmp/version.js'}))
         .pipe(gulp.dest('dist/js/'));
-});
+}));
 
 gulp.task('svg', gulp.series('svg:enum'));
 
-gulp.task('sass', gulp.series('palette', 'sprites'), (done) => {
+gulp.task('sass', gulp.series('palette', 'sprites', (done) => {
     return gulp.src('./scss/guide.scss')
         .pipe(sourcemaps.init())
         .pipe(sass().on('error', (err) => {
             sassError(err, done);
         }))
-        .pipe(autoprefixer(autoprefixerOptions))
+        .pipe(autoprefixer(config.autoprefixerOptions))
         .pipe(rename('CoveoStyleGuide.css'))
         .pipe(sourcemaps.write('../css'))
         .pipe(gulp.dest('./dist/css'))
@@ -222,7 +230,7 @@ gulp.task('sass', gulp.series('palette', 'sprites'), (done) => {
         .pipe(gulpif(useGzippedSources, gzip(config.gzipOptions)))
         .pipe(gulpif(useMinifiedSources, rename('CoveoStyleGuide.min.css')))
         .pipe(gulpif(useMinifiedSources, gulp.dest('./dist/css')));
-});
+}));
 
 gulp.task('sass:format', () => {
     return gulp.src([
@@ -255,10 +263,10 @@ gulp.task('docs:external-libs', () => {
         .pipe(gulp.dest('./docs/dist/js'));
 });
 
-gulp.task('docs', gulp.series('default', 'docs:external-libs'), () => {
+gulp.task('docs', gulp.series('default', 'docs:external-libs', () => {
     return gulp.src('./dist/**/*')
         .pipe(gulp.dest('./docs/dist'));
-});
+}));
 
 gulp.task('watch', () => {
     gulp.watch(['./scss/**/*.scss', '!./scss/common/palette-map.scss', '!./scss/sprites.scss'], gulp.series('docs'));
