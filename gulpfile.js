@@ -6,8 +6,9 @@ const del = require('del');
 const pngSprite = require('coveo-png-sprite');
 const gulp = require('gulp');
 const fs = require('fs');
+const colors = require('ansi-colors');
+const log = require('fancy-log');
 const gulpif = require('gulp-if');
-const gutil = require('gulp-util');
 const gzip = require('gulp-gzip');
 const concat = require('gulp-concat');
 const rename = require('gulp-rename');
@@ -17,6 +18,8 @@ const svgmin = require('gulp-svgmin');
 const cheerio = require('gulp-cheerio');
 const filesToJson = require('gulp-files-to-json');
 const sortJSON = require('gulp-json-sort').default;
+const PluginError = require('plugin-error');
+const parseArgs = require('minimist');
 
 const config = {
     autoprefixerOptions: {
@@ -27,10 +30,10 @@ const config = {
     },
 };
 
-const gzipOptions = config.gzipOptions;
-
-const useMinifiedSources = gutil.env.min;
-const useGzippedSources = gutil.env.gzip;
+const argv = parseArgs(process.argv.slice(2), {boolean: ['min', 'gzip', 'all']});
+const useMinifiedSources = argv.min;
+const useGzippedSources = argv.gzip;
+const cleanAll = argv.all;
 
 gulp.task('lib', () => {
     const dependencies = [
@@ -44,7 +47,7 @@ gulp.task('lib', () => {
         fs.exists(path, (exists) => {
             if (!exists) {
                 if (path.indexOf('*') === -1) {
-                    gutil.log(gutil.colors.red('File not found: ', path));
+                    log(colors.red('File not found: ', path));
                     process.exit(1);
                 }
             }
@@ -55,14 +58,14 @@ gulp.task('lib', () => {
         .pipe(concat('CoveoStyleGuide.Dependencies.js'))
         .pipe(gulp.dest('./dist/js'))
         .pipe(gulpif(useMinifiedSources, uglify()))
-        .pipe(gulpif(useGzippedSources, gzip(gzipOptions)))
+        .pipe(gulpif(useGzippedSources, gzip(config.gzipOptions)))
         .pipe(gulpif(useMinifiedSources, rename('CoveoStyleGuide.Dependencies.min.js')))
         .pipe(gulpif(useMinifiedSources, gulp.dest('./dist/js')));
 });
 
 gulp.task('clean', () => {
     const filesToDelete = ['./dist', './docs/dist', './_gh_pages', './.sass-cache', './tmp'];
-    if (gutil.env.all === true) {
+    if (cleanAll) {
         filesToDelete.concat([
             '**/*.orig',
             '**/*.rej',
@@ -71,7 +74,7 @@ gulp.task('clean', () => {
         ]);
     }
     return del(filesToDelete).then((deletedFiles) => {
-        console.log('Files deleted:', deletedFiles.join(', '));
+        log(colors.green('Files deleted:', deletedFiles.join(', ')));
     });
 });
 
@@ -216,7 +219,7 @@ gulp.task('sass', gulp.series('palette', 'sprites'), (done) => {
             keepSpecialComments: 0,
             processImport: false,
         })))
-        .pipe(gulpif(useGzippedSources, gzip(gzipOptions)))
+        .pipe(gulpif(useGzippedSources, gzip(config.gzipOptions)))
         .pipe(gulpif(useMinifiedSources, rename('CoveoStyleGuide.min.css')))
         .pipe(gulpif(useMinifiedSources, gulp.dest('./dist/css')));
 });
@@ -236,16 +239,14 @@ gulp.task('sass:format', () => {
 });
 
 function sassError(err, doneCallback) {
-    process.stderr.write(new gutil.PluginError('sass', err.messageFormatted).toString() + '\n');
+    process.stderr.write(new PluginError('sass', err.messageFormatted).toString() + '\n');
     doneCallback(1);
 }
 
 gulp.task('default', gulp.series(
     'sass',
     'lib',
-    'copy:images',
-    'copy:fonts',
-    'copy:js',
+    gulp.parallel('copy:images', 'copy:fonts', 'copy:js'),
     'svg'
 ));
 
@@ -260,6 +261,6 @@ gulp.task('docs', gulp.series('default', 'docs:external-libs'), () => {
 });
 
 gulp.task('watch', () => {
-    gulp.watch('./scss/**/*', ['docs']);
-    gulp.watch('./resources/js/**/*', ['copy:js']);
+    gulp.watch(['./scss/**/*.scss', '!./scss/common/palette-map.scss', '!./scss/sprites.scss'], gulp.series('docs'));
+    gulp.watch('./resources/js/*.js', gulp.series('copy:js'));
 });
