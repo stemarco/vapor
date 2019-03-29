@@ -1,5 +1,5 @@
 @for $i from 1 through length($transparencies) {
-  .mod-transparency-#{$i} {
+  .transparency-#{$i} {
     opacity: nth($transparencies, $i);
   }
 }
