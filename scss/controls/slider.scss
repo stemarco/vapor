@@ -12,8 +12,8 @@
   .rc-slider-track {
     height: $slider-track-height;
 
-    background: linear-gradient(90deg, $blue-5, $blue-8);
-    border-radius: $slider-track-border-radius;
+    background: $blue-5;
+    border-radius: 0;
   }
 
   .rc-slider-dot {
