@@ -1,0 +1,11 @@
+---
+layout: default
+title: General Guidelines
+type: generalGuidelines
+permalink: /general-guidelines/
+---
+
+{% assign entries = site.components | where:"type", page.type %}
+{% for entry in entries %}
+{% include component.html %}
+{% endfor %}
